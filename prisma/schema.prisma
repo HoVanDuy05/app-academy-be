@@ -1,0 +1,948 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================================
+// GROUP 1: IDENTITY & PROFILES (HUMAN MANAGEMENT)
+// ==========================================================
+
+enum Role {
+  ADMIN
+  STAFF
+  TEACHER
+  STUDENT
+  PARENT
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum EducationLevel {
+  COLLEGE
+  UNIVERSITY
+  MASTER
+  DOCTOR
+  OTHER
+}
+
+enum StudyStatus {
+  STUDYING
+  SUSPENDED
+  DROPOUT
+  GRADUATED
+  TRANSFERRED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum FeeStatus {
+  PAID
+  UNPAID
+  OVERDUE
+  PARTIAL
+}
+
+
+model User {
+  id          Int      @id @default(autoincrement())
+  username    String   @unique @map("username")
+  password    String?  @map("password")
+  email       String?  @unique
+  phoneNumber String?  @unique @map("phone_number")
+  isActivated Boolean  @default(false) @map("is_activated")
+  verifyCode  String?  @map("verify_code")
+  googleId    String?  @unique @map("google_id")
+  role        Role     @map("role")
+  fullName    String?  @map("full_name")
+  code        String?  @unique @map("code")
+  avatar      String?  @map("avatar")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  teacherProfile TeacherProfile?
+  studentProfile StudentProfile?
+  staffProfile   StaffProfile?
+  notifications  Notification[]
+  chatChannels   ChannelMember[]
+  messages       Message[]
+
+  // Approval & Social
+  approvalRequests ApprovalRequest[]
+  approvalLogs     ApprovalLog[]
+  socialPosts      SocialPost[]
+  postLikes        PostLike[]
+  postReposts      PostRepost[]
+  following        Follower[]        @relation("Following")
+  followers        Follower[]        @relation("Followers")
+  socialProfile    SocialProfile?
+
+  // Friendship
+  friendRequestsSent     Friendship[] @relation("SentRequests")
+  friendRequestsReceived Friendship[] @relation("ReceivedRequests")
+
+  // Advanced Approval Flow
+  workflowCreated         Workflow[]            @relation("WorkflowCreator")
+  workflowSessionsCreated WorkflowSession[]     @relation("SessionCreator")
+  workflowApprovalLogs    WorkflowApprovalLog[] @relation("ApproverLog")
+  assignedApprovalSteps   StepApprover[]
+  posts                   Post[]
+
+  @@map("users")
+}
+
+model TeacherProfile {
+  id           Int       @id @default(autoincrement())
+  userId       Int       @unique @map("user_id")
+  teacherCode  String    @unique @map("teacher_code")
+  fullName     String    @map("full_name")
+  birthday     DateTime? @map("birthday")
+  gender       Gender    @default(MALE) @map("gender")
+  address      String?   @map("address")
+  phoneNumber  String?   @map("phone_number")
+  contactEmail String?   @map("contact_email")
+
+  // Identification Documents
+  idCard      String?   @unique @map("id_card")
+  idCardDate  DateTime? @map("id_card_date")
+  idCardPlace String?   @map("id_card_place")
+
+  // Professional Information
+  educationLevel EducationLevel @default(UNIVERSITY) @map("education_level")
+  specialization String?        @map("specialization")
+  joinDate       DateTime?      @map("join_date")
+
+  // Relations
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  homeroomClasses    Class[]
+  academicClasses    AcademicClass[]
+  teacherAssignments TeacherAssignment[]
+  schedules          Schedule[]
+  newSchedules       NewSchedule[]
+
+  @@map("teacher_profiles")
+}
+
+model StudentProfile {
+  id               Int       @id @default(autoincrement())
+  userId           Int       @unique @map("user_id")
+  studentCode      String    @unique @map("student_code")
+  fullName         String    @map("full_name")
+  birthday         DateTime? @map("birthday")
+  gender           Gender    @default(MALE) @map("gender")
+  birthPlace       String?   @map("birth_place")
+  ethnicity        String?   @map("ethnicity")
+  religion         String?   @map("religion")
+  permanentAddress String?   @map("permanent_address")
+  temporaryAddress String?   @map("temporary_address")
+  phoneNumber      String?   @map("phone_number")
+
+  // Identification Documents
+  idCard      String?   @unique @map("id_card")
+  idCardDate  DateTime? @map("id_card_date")
+  idCardPlace String?   @map("id_card_place")
+
+  // Parent Information
+  fatherName       String? @map("father_name")
+  fatherOccupation String? @map("father_occupation")
+  fatherPhone      String? @map("father_phone")
+
+  // Mother Information
+  motherName       String? @map("mother_name")
+  motherOccupation String? @map("mother_occupation")
+  motherPhone      String? @map("mother_phone")
+
+  // Academic Information
+  enrollmentDate DateTime?   @map("enrollment_date")
+  status         StudyStatus @default(STUDYING) @map("status")
+  classId        Int?        @map("class_id")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // NEW relation
+  classEnrollments StudentClassEnrollment[]
+
+  gradePoints GradePoint[]
+  class       Class?       @relation(fields: [classId], references: [id])
+  attendances Attendance[]
+  fees        Fee[]
+
+  @@map("student_profiles")
+}
+
+model StaffProfile {
+  id           Int       @id @default(autoincrement())
+  userId       Int       @unique @map("user_id")
+  staffCode    String    @unique @map("staff_code")
+  fullName     String    @map("full_name")
+  birthday     DateTime? @map("birthday")
+  gender       Gender    @default(MALE) @map("gender")
+  address      String?   @map("address")
+  phoneNumber  String?   @map("phone_number")
+  contactEmail String?   @map("contact_email")
+  idCard       String?   @unique @map("id_card")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("staff_profiles")
+}
+
+// ==========================================================
+// GROUP 2: ACADEMIC STRUCTURE (SCHOOL STRUCTURE)
+// ==========================================================
+
+model AcademicYear {
+  id        Int       @id @default(autoincrement())
+  yearName  String    @map("year_name")
+  startDate DateTime? @map("start_date")
+  endDate   DateTime? @map("end_date")
+  isActive  Boolean   @default(false) @map("is_active")
+
+  // Relations
+  academicClasses    AcademicClass[]
+  semesters          Semester[]
+  teacherAssignments TeacherAssignment[]
+
+  @@map("academic_years")
+}
+
+model Semester {
+  id             Int       @id @default(autoincrement())
+  semesterName   String    @map("semester_name")
+  academicYearId Int       @map("academic_year_id")
+  startDate      DateTime? @map("start_date")
+  endDate        DateTime? @map("end_date")
+  isActive       Boolean   @default(false) @map("is_active")
+
+  // Relations
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  gradePoints  GradePoint[]
+
+  @@map("semesters")
+}
+
+model GradeLevel {
+  id          Int       @id @default(autoincrement())
+  levelName   String    @map("level_name")
+  levelCode   Int       @unique @map("level_code")
+  description String?   @map("description")
+  classes     Class[]
+  subjects    Subject[]
+
+  @@map("grade_levels")
+}
+
+model Subject {
+  id           Int      @id @default(autoincrement())
+  subjectName  String   @map("subject_name")
+  subjectCode  String?  @unique @map("subject_code")
+  description  String?  @map("description")
+  gradeLevelId Int?     @map("grade_level_id")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  gradeLevel         GradeLevel?         @relation(fields: [gradeLevelId], references: [id], onDelete: SetNull)
+  schedules          Schedule[]
+  teacherAssignments TeacherAssignment[]
+  gradePoints        GradePoint[]
+  newSchedules       NewSchedule[]
+
+  @@map("subjects")
+}
+
+model TeacherAssignment {
+  id              Int @id @default(autoincrement())
+  teacherId       Int @map("teacher_id")
+  subjectId       Int @map("subject_id")
+  academicClassId Int @map("academic_class_id")
+  academicYearId  Int @map("academic_year_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  teacher       TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subject       Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  academicClass AcademicClass  @relation(fields: [academicClassId], references: [id], onDelete: Cascade)
+  academicYear  AcademicYear   @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, subjectId, academicClassId])
+  @@map("teacher_assignments")
+}
+
+model GradePoint {
+  id         Int @id @default(autoincrement())
+  studentId  Int @map("student_id")
+  subjectId  Int @map("subject_id")
+  semesterId Int @map("semester_id")
+
+  midtermGrade Decimal? @map("midterm_grade")
+  finalGrade   Decimal? @map("final_grade")
+  averageGrade Decimal? @map("average_grade")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  student  StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject  Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  semester Semester       @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, subjectId, semesterId])
+  @@map("grade_points")
+}
+
+model Class {
+  id           Int     @id @default(autoincrement())
+  className    String  @map("class_name")
+  gradeLevelId Int?    @map("grade_level_id")
+  description  String? @map("description")
+
+  // Relations
+  gradeLevel       GradeLevel?      @relation(fields: [gradeLevelId], references: [id])
+  academicClasses  AcademicClass[]
+  studentProfiles  StudentProfile[]
+  schedules        Schedule[]
+  teacherProfile   TeacherProfile?  @relation(fields: [teacherProfileId], references: [id])
+  teacherProfileId Int?
+  attendances      Attendance[]
+
+  @@map("classes")
+}
+
+model AcademicClass {
+  id                Int  @id @default(autoincrement())
+  classId           Int  @map("class_id")
+  academicYearId    Int  @map("academic_year_id")
+  homeroomTeacherId Int? @map("homeroom_teacher_id")
+  studentLimit      Int  @default(0) @map("student_limit")
+
+  class           Class           @relation(fields: [classId], references: [id], onDelete: Cascade)
+  academicYear    AcademicYear    @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  homeroomTeacher TeacherProfile? @relation(fields: [homeroomTeacherId], references: [id], onDelete: SetNull)
+
+  enrollments        StudentClassEnrollment[]
+  newSchedules       NewSchedule[]
+  teacherAssignments TeacherAssignment[]
+
+  @@unique([classId, academicYearId])
+  @@map("academic_classes")
+}
+
+model StudentClassEnrollment {
+  id              Int         @id @default(autoincrement())
+  studentId       Int         @map("student_id")
+  academicClassId Int         @map("academic_class_id")
+  joinDate        DateTime    @default(now()) @map("join_date")
+  leaveDate       DateTime?   @map("leave_date")
+  status          StudyStatus @default(STUDYING) @map("status")
+
+  student       StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  academicClass AcademicClass  @relation(fields: [academicClassId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, academicClassId])
+  @@map("student_class_enrollments")
+}
+
+model Schedule {
+  id          Int      @id @default(autoincrement())
+  classId     Int      @map("class_id")
+  subjectId   Int      @map("subject_id")
+  teacherId   Int?     @map("teacher_id")
+  dayOfWeek   Int      @map("day_of_week")
+  startPeriod Int      @map("start_period")
+  periodCount Int      @map("period_count")
+  room        String?  @map("room")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  class   Class           @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject Subject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher TeacherProfile? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+
+  @@map("schedules")
+}
+
+model NewSchedule {
+  id              Int       @id @default(autoincrement())
+  academicClassId Int       @map("academic_class_id")
+  subjectId       Int       @map("subject_id")
+  teacherId       Int?      @map("teacher_id")
+  dayOfWeek       Int       @map("day_of_week")
+  startPeriod     Int       @map("start_period")
+  periodCount     Int       @map("period_count")
+  room            String?   @map("room")
+  date            DateTime? @map("date")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  academicClass AcademicClass   @relation(fields: [academicClassId], references: [id], onDelete: Cascade)
+  subject       Subject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher       TeacherProfile? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+
+  @@map("new_schedules")
+}
+
+model Attendance {
+  id        Int              @id @default(autoincrement())
+  studentId Int              @map("student_id")
+  classId   Int              @map("class_id")
+  date      DateTime         @default(now()) @map("date")
+  status    AttendanceStatus @default(PRESENT) @map("status")
+  notes     String?          @map("notes")
+
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class   Class          @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@map("attendances")
+}
+
+model Fee {
+  id          Int       @id @default(autoincrement())
+  studentId   Int       @map("student_id")
+  title       String    @map("title")
+  amount      Decimal   @map("amount")
+  dueDate     DateTime  @map("due_date")
+  status      FeeStatus @default(UNPAID) @map("status")
+  description String?   @map("description")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("fees")
+}
+
+
+// ==========================================================
+// GROUP 3: NOTIFICATIONS
+// ==========================================================
+
+enum NotificationType {
+  SYSTEM
+  PERSONAL
+  ACADEMIC
+  MESSAGE
+  APPROVAL
+  SOCIAL
+}
+
+model Notification {
+  id          Int              @id @default(autoincrement())
+  recipientId Int              @map("recipient_id")
+  title       String           @map("title")
+  content     String           @map("content")
+  type        NotificationType @default(SYSTEM) @map("type")
+  link        String?          @map("link")
+  isRead      Boolean          @default(false) @map("is_read")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  // Relations
+  recipient User @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// ==========================================================
+// GROUP 4: CHAT & MESSAGING (SOCIAL FEATURE)
+// ==========================================================
+
+enum ChatType {
+  PRIVATE
+  GROUP
+  CLASS
+}
+
+enum ChatRole {
+  ADMIN
+  MEMBER
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  VOICE
+}
+
+model ChatChannel {
+  id          Int      @id @default(autoincrement())
+  channelName String?  @map("channel_name")
+  chatType    ChatType @default(PRIVATE) @map("chat_type")
+  avatar      String?  @map("avatar")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  members  ChannelMember[]
+  messages Message[]
+
+  @@map("chat_channels")
+}
+
+model ChannelMember {
+  id        Int      @id @default(autoincrement())
+  channelId Int      @map("channel_id")
+  userId    Int      @map("user_id")
+  role      ChatRole @default(MEMBER) @map("role")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+
+  // Relations
+  channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+  @@map("channel_members")
+}
+
+model Message {
+  id            Int         @id @default(autoincrement())
+  channelId     Int         @map("channel_id")
+  senderId      Int         @map("sender_id")
+  content       String?     @map("content")
+  type          MessageType @default(TEXT) @map("type")
+  fileUrl       String?     @map("file_url")
+  sentAt        DateTime    @default(now()) @map("sent_at")
+  isEdited      Boolean     @default(false) @map("is_edited")
+  originalMsgId Int?        @map("original_msg_id")
+
+  // Relations
+  channel     ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  sender      User        @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  originalMsg Message?    @relation("MessageReply", fields: [originalMsgId], references: [id], onDelete: SetNull)
+  replies     Message[]   @relation("MessageReply")
+
+  @@map("messages")
+}
+
+model Friendship {
+  id          Int      @id @default(autoincrement())
+  senderId    Int      @map("sender_id")
+  recipientId Int      @map("recipient_id")
+  status      String   @map("status")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  sender    User @relation("SentRequests", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User @relation("ReceivedRequests", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, recipientId])
+  @@map("friendships")
+}
+
+// ==========================================================
+// GROUP 5: SOCIAL NETWORK (SOCIAL - POSTS FEATURE)
+// ==========================================================
+
+model SocialPost {
+  id           Int      @id @default(autoincrement())
+  authorId     Int      @map("author_id")
+  content      String   @map("content")
+  image        String?  @map("image")
+  parentPostId Int?     @map("parent_post_id")
+  viewCount    Int      @default(0) @map("view_count")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  author     User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parentPost SocialPost?  @relation("PostReplies", fields: [parentPostId], references: [id], onDelete: Cascade)
+  replies    SocialPost[] @relation("PostReplies")
+  likes      PostLike[]
+  reposts    PostRepost[]
+
+  @@map("social_posts")
+}
+
+model PostLike {
+  id        Int      @id @default(autoincrement())
+  postId    Int      @map("post_id")
+  userId    Int      @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  post SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("post_likes")
+}
+
+model PostRepost {
+  id        Int      @id @default(autoincrement())
+  postId    Int      @map("post_id")
+  userId    Int      @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  post SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("post_reposts")
+}
+
+model Follower {
+  id          Int      @id @default(autoincrement())
+  followingId Int      @map("following_id")
+  followerId  Int      @map("follower_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  follower  User @relation("Followers", fields: [followerId], references: [id], onDelete: Cascade)
+
+  @@unique([followingId, followerId])
+  @@map("followers")
+}
+
+model SocialProfile {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @unique @map("user_id")
+  bio             String?   @map("bio")
+  coverImage      String?   @map("cover_image")
+  displayBirthday DateTime? @map("display_birthday")
+  displayAddress  String?   @map("display_address")
+  socialLinks     String?   @map("social_links")
+  hobbies         String?   @map("hobbies")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("social_profiles")
+}
+
+// ==========================================================
+// GROUP 6: APPROVAL WORKFLOWS (FLOW FEATURE)
+// ==========================================================
+
+enum WorkflowStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+enum StepRuleType {
+  ANY
+  ALL
+}
+
+enum ApproverType {
+  USER
+  ROLE
+  GROUP
+}
+
+enum FormFieldType {
+  TEXT
+  NUMBER
+  TEXTAREA
+  LONG_TEXT
+  SELECT
+  DATE
+  DATETIME
+  TIME
+  CHECKBOX
+  RADIO
+  FILE
+  SECTION_HEADER
+  QUILL
+  MULTI_DATE
+  SELECT_AFFILIATION
+  SELECT_DATE_OFF_TYPE
+  DEFAULT_INPUT
+  IMAGE
+}
+
+enum SessionStatus {
+  PENDING
+  PROCESSING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum SessionStepStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SKIPPED
+}
+
+enum ApprovalAction {
+  APPROVE
+  REJECT
+  REQUEST_EDIT
+}
+
+model WorkflowCategory {
+  id          Int      @id @default(autoincrement())
+  name        String   @map("name")
+  description String?  @map("description")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  workflows Workflow[]
+
+  @@map("workflow_categories")
+}
+
+model Workflow {
+  id          Int            @id @default(autoincrement())
+  name        String         @map("name")
+  description String?        @map("description")
+  status      WorkflowStatus @default(DRAFT) @map("status")
+  creatorId   Int            @map("creator_id")
+  categoryId  Int?           @map("category_id")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  creator    User                @relation("WorkflowCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  category   WorkflowCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  steps      WorkflowStep[]
+  formFields WorkflowFormField[]
+  sessions   WorkflowSession[]
+
+  @@map("workflows")
+}
+
+model WorkflowStep {
+  id         Int          @id @default(autoincrement())
+  workflowId Int          @map("workflow_id")
+  stepOrder  Int          @map("step_order")
+  name       String       @map("name")
+  ruleType   StepRuleType @default(ANY) @map("rule_type")
+
+  // Relations
+  workflow     Workflow       @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  approvers    StepApprover[]
+  sessionSteps SessionStep[]
+
+  @@map("workflow_steps")
+}
+
+model StepApprover {
+  id           Int          @id @default(autoincrement())
+  stepId       Int          @map("step_id")
+  approverType ApproverType @map("approver_type")
+  approverId   Int?         @map("approver_id")
+  approverRole String?      @map("approver_role")
+
+  // Relations
+  step   WorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  user   User?        @relation(fields: [userId], references: [id])
+  userId Int?
+
+  @@map("step_approvers")
+}
+
+model WorkflowFormField {
+  id         Int           @id @default(autoincrement())
+  workflowId Int           @map("workflow_id")
+  fieldName  String        @map("field_name")
+  label      String        @map("label")
+  type       FormFieldType @map("type")
+  isRequired Boolean       @default(false) @map("is_required")
+  options    String?       @map("options")
+  order      Int           @map("order")
+
+  // Relations
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@map("workflow_form_fields")
+}
+
+model WorkflowSession {
+  id          Int           @id @default(autoincrement())
+  workflowId  Int           @map("workflow_id")
+  formData    String?       @map("form_data")
+  status      SessionStatus @default(PENDING) @map("status")
+  currentStep Int           @default(1) @map("current_step")
+  creatorId   Int           @map("creator_id")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  workflow     Workflow              @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  creator      User                  @relation("SessionCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  sessionSteps SessionStep[]
+  approvalLogs WorkflowApprovalLog[]
+
+  @@map("workflow_sessions")
+}
+
+model SessionStep {
+  id         Int               @id @default(autoincrement())
+  sessionId  Int               @map("session_id")
+  stepId     Int               @map("step_id")
+  status     SessionStepStatus @default(PENDING) @map("status")
+  approverId Int?              @map("approver_id")
+  approvedAt DateTime?         @map("approved_at")
+
+  // Relations
+  session WorkflowSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  step    WorkflowStep    @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@map("session_steps")
+}
+
+model WorkflowApprovalLog {
+  id        Int            @id @default(autoincrement())
+  sessionId Int            @map("session_id")
+  stepId    Int?           @map("step_id")
+  userId    Int            @map("user_id")
+  action    ApprovalAction @map("action")
+  content   String?        @map("content")
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  // Relations
+  session WorkflowSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User            @relation("ApproverLog", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("workflow_approval_logs")
+}
+
+// ==========================================================
+// GROUP 7: SIMPLE APPROVAL PROCESS
+// ==========================================================
+
+enum SimpleApprovalStatus {
+  PENDING
+  PROCESSING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model ApprovalType {
+  id          Int      @id @default(autoincrement())
+  typeName    String   @map("type_name")
+  typeCode    String   @unique @map("type_code")
+  description String?  @map("description")
+  formConfig  String?  @map("form_config")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  requests ApprovalRequest[]
+  steps    ApprovalStep[]
+
+  @@map("approval_types")
+}
+
+model ApprovalStep {
+  id             Int    @id @default(autoincrement())
+  approvalTypeId Int    @map("approval_type_id")
+  stepName       String @map("step_name")
+  order          Int    @map("order")
+  approvalRole   Role   @map("approval_role")
+
+  // Relations
+  approvalType ApprovalType  @relation(fields: [approvalTypeId], references: [id], onDelete: Cascade)
+  logs         ApprovalLog[]
+
+  @@map("approval_steps")
+}
+
+model ApprovalRequest {
+  id             Int                  @id @default(autoincrement())
+  approvalTypeId Int                  @map("approval_type_id")
+  requesterId    Int                  @map("requester_id")
+  approverId     Int?                 @map("approver_id")
+  title          String               @map("title")
+  formData       String               @map("form_data")
+  status         SimpleApprovalStatus @default(PENDING) @map("status")
+  currentStep    Int                  @default(1) @map("current_step")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  // Relations
+  approvalType ApprovalType  @relation(fields: [approvalTypeId], references: [id], onDelete: Cascade)
+  requester    User          @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+  logs         ApprovalLog[]
+
+  @@map("approval_requests")
+}
+
+model ApprovalLog {
+  id         Int                  @id @default(autoincrement())
+  requestId  Int                  @map("request_id")
+  stepId     Int                  @map("step_id")
+  approverId Int?                 @map("approver_id")
+  action     SimpleApprovalStatus @map("action")
+  notes      String?              @map("notes")
+  createdAt  DateTime             @default(now()) @map("created_at")
+
+  // Relations
+  request  ApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  step     ApprovalStep    @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  approver User?           @relation(fields: [approverId], references: [id], onDelete: SetNull)
+
+  @@map("approval_logs")
+}
+
+// ==========================================================
+// GROUP 8: PORTAL & CMS
+// ==========================================================
+
+model Banner {
+  id          Int      @id @default(autoincrement())
+  title       String?  @map("title")
+  description String?  @map("description")
+  image       String   @map("image")
+  link        String?  @map("link")
+  order       Int      @default(0) @map("order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("banners")
+}
+
+enum PostType {
+  NEWS
+  EVENT
+  GENERAL_ANNOUNCEMENT
+  GUIDE
+}
+
+model Post {
+  id          Int      @id @default(autoincrement())
+  title       String   @map("title")
+  slug        String   @unique @map("slug")
+  summary     String?  @map("summary")
+  content     String   @map("content")
+  thumbnail   String?  @map("thumbnail")
+  type        PostType @default(NEWS) @map("type")
+  targetGroup Json?    @map("target_group")
+  isPublished Boolean  @default(false) @map("is_published")
+  viewCount   Int      @default(0) @map("view_count")
+  authorId    Int?     @map("author_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@map("posts")
+}
