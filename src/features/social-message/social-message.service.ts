@@ -7,7 +7,7 @@ export class SocialMessageService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
-  ) {}
+  ) { }
 
   // ==================== THREADS (SOCIAL POSTS) ====================
   async createThread(userId: number, data: {
@@ -131,9 +131,9 @@ export class SocialMessageService {
             _count: { select: { likes: true, replies: true } },
             likes: userId
               ? {
-                  where: { userId: userId },
-                  select: { userId: true },
-                }
+                where: { userId: userId },
+                select: { userId: true },
+              }
               : false,
           },
           orderBy: { createdAt: 'asc' },
@@ -143,9 +143,9 @@ export class SocialMessageService {
         },
         likes: userId
           ? {
-              where: { userId: userId },
-              select: { userId: true },
-            }
+            where: { userId: userId },
+            select: { userId: true },
+          }
           : false,
       },
     });
@@ -184,9 +184,9 @@ export class SocialMessageService {
         },
         likes: requesterId
           ? {
-              where: { userId: requesterId },
-              select: { userId: true },
-            }
+            where: { userId: requesterId },
+            select: { userId: true },
+          }
           : false,
       },
       orderBy: { createdAt: 'desc' },
@@ -639,7 +639,7 @@ export class SocialMessageService {
     let isFollowing = false;
     let friendshipStatus: 'NONE' | 'FRIEND' | 'SENT' | 'RECEIVED' = 'NONE';
     let mutualFriendsCount = 0;
-    
+
     // Get total friends count
     const friendsCount = await this.prisma.friendship.count({
       where: {
@@ -688,10 +688,10 @@ export class SocialMessageService {
         select: { senderId: true, recipientId: true },
       });
 
-      const userFriendIds = new Set(userFriends.flatMap(f => f.senderId === userId ? f.recipientId : f.senderId));
-      const requesterFriendIds = requesterFriends.flatMap(f => f.senderId === requesterId ? f.recipientId : f.senderId);
-      
-      mutualFriendsCount = requesterFriendIds.filter(id => userFriendIds.has(id)).length;
+      const userFriendIds = new Set(userFriends.flatMap((f: { senderId: number; recipientId: number }) => f.senderId === userId ? f.recipientId : f.senderId));
+      const requesterFriendIds = requesterFriends.flatMap((f: { senderId: number; recipientId: number }) => f.senderId === requesterId ? f.recipientId : f.senderId);
+
+      mutualFriendsCount = requesterFriendIds.filter((id: number) => userFriendIds.has(id)).length;
     }
 
     // Get latest photos (from posts)
@@ -712,7 +712,7 @@ export class SocialMessageService {
       take: 6,
     });
 
-    const sampleFriends = sampleFriendsRaw.map(f => f.senderId === userId ? f.recipient : f.sender);
+    const sampleFriends = sampleFriendsRaw.map((f: { senderId: number; sender: any; recipient: any }) => f.senderId === userId ? f.recipient : f.sender);
 
     return {
       ...user,
@@ -726,7 +726,7 @@ export class SocialMessageService {
       social: {
         isFollowing,
         friendshipStatus,
-        recentPhotos: recentPhotos.map(p => p.image).filter(Boolean),
+        recentPhotos: recentPhotos.map((p: { image: string | null }) => p.image).filter(Boolean),
         sampleFriends,
       },
     };

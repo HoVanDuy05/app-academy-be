@@ -413,7 +413,7 @@ export class ApprovalFlowService {
     });
 
     // Handle next step or finish
-    const currentStepIndex = session.workflow.steps.findIndex(b => b.id === stepId);
+    const currentStepIndex = session.workflow.steps.findIndex((b: { id: number }) => b.id === stepId);
     const nextStep = session.workflow.steps[currentStepIndex + 1];
 
     if (action === ApprovalAction.REJECT) {
@@ -494,7 +494,7 @@ export class ApprovalFlowService {
       select: { stepId: true },
     });
 
-    const stepIdList = stepIds.map(b => b.stepId);
+    const stepIdList = stepIds.map((b: { stepId: number }) => b.stepId);
 
     // Get processing sessions at these steps
     return this.prisma.workflowSession.findMany({
